@@ -1,0 +1,51 @@
+- name: Supprimer un GitLab Runner shell proprement
+  hosts: gitlab
+  become: yes
+  vars:
+    runner_name: "ansible-runner-{{ ansible_hostname }}"
+
+  tasks:
+    - name: Vérifier si gitlab-runner est installé
+      stat:
+        path: /usr/bin/gitlab-runner
+      register: runner_bin
+
+    - name: Désenregistrer le runner de GitLab
+      shell: |
+        gitlab-runner unregister --name "{{ runner_name }}"
+      when: runner_bin.stat.exists
+      ignore_errors: yes
+
+    - name: Arrêter le service GitLab Runner
+      systemd:
+        name: gitlab-runner
+        state: stopped
+        enabled: no
+      when: runner_bin.stat.exists
+
+    - name: Supprimer le service gitlab-runner
+      shell: |
+        gitlab-runner uninstall
+      when: runner_bin.stat.exists
+      ignore_errors: yes
+
+    - name: Supprimer le dossier de configuration GitLab Runner
+      file:
+        path: /etc/gitlab-runner
+        state: absent
+
+    - name: Supprimer le répertoire home du user gitlab-runner (cache, logs)
+      file:
+        path: /home/gitlab-runner
+        state: absent
+
+    - name: Supprimer le binaire gitlab-runner s’il reste
+      file:
+        path: /usr/bin/gitlab-runner
+        state: absent
+
+    - name: (Optionnel) Supprimer l’utilisateur gitlab-runner
+      user:
+        name: gitlab-runner
+        state: absent
+        remove: yes

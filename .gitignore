@@ -1,0 +1,14 @@
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+gitlab-aws-deploy/terraform/.terraform/
+gitlab-aws-deploy/terraform/*.tfstate
+gitlab-aws-deploy/terraform/*.tfstate.*
+lambda_function.zip
+.env
+token.env
+*.log
+.vagrant/
+.DS_Store

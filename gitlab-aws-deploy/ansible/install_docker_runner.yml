@@ -1,0 +1,124 @@
+- name: Installer et enregistrer un GitLab Runner avec Docker
+  hosts: gitlab
+  become: yes
+  vars:
+    gitlab_url: "{{ lookup('env', 'GITLAB_URL') }}"
+    registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
+    runner_name: "docker-runner-{{ ansible_hostname }}"
+    runner_tags: "docker,infra,ansible"
+    gitlab_runner_gpg_url: "https://packages.gitlab.com/runner/gitlab-runner/gpgkey"
+    gitlab_runner_repo: "deb https://packages.gitlab.com/runner/gitlab-runner/ubuntu/ {{ ansible_distribution_release }} main"
+
+  tasks:
+
+    - name: Afficher les variables utilisées
+      debug:
+        msg: "URL={{ gitlab_url }}, TOKEN={{ registration_token }}"
+    
+    - name: Supprimer les anciens dépôts GitLab Runner s'ils existent
+      file:
+        path: "/etc/apt/sources.list.d/gitlab-runner.list"
+        state: absent
+
+    - name: Installer les dépendances
+      apt:
+        name:
+          - curl
+          - git
+          - ca-certificates
+          - apt-transport-https
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+        update_cache: yes
+
+    - name: Installer Docker via le script officiel
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Démarrer et activer Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Créer l’utilisateur gitlab-runner
+      user:
+        name: gitlab-runner
+        system: yes
+        shell: /bin/bash
+        home: /home/gitlab-runner
+        create_home: yes
+
+    - name: Ajouter l’utilisateur gitlab-runner au groupe docker
+      user:
+        name: gitlab-runner
+        groups: docker
+        append: yes
+
+    - name: Télécharger et installer la clé GPG de GitLab Runner
+      shell: |
+        curl -fsSL {{ gitlab_runner_gpg_url }} | gpg --dearmor -o /usr/share/keyrings/gitlab-runner-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/gitlab-runner-archive-keyring.gpg
+
+    - name: Ajouter le dépôt GitLab Runner manuellement
+      copy:
+        dest: /etc/apt/sources.list.d/gitlab-runner.list
+        content: |
+          deb [signed-by=/usr/share/keyrings/gitlab-runner-archive-keyring.gpg] https://packages.gitlab.com/runner/gitlab-runner/ubuntu/ {{ ansible_distribution_release }} main
+
+    - name: Mettre à jour le cache APT
+      apt:
+        update_cache: yes
+
+    - name: Installer GitLab Runner
+      apt:
+        name: gitlab-runner
+        state: latest
+        update_cache: yes
+
+    - name: Vérifier si le runner est déjà enregistré
+      shell: gitlab-runner list 2>/dev/null | grep -q "{{ runner_name }}" || echo "not_registered"
+      register: runner_check
+      failed_when: false
+      changed_when: false
+
+    - name: Enregistrer le GitLab Runner
+      command: >
+        gitlab-runner register
+        --non-interactive
+        --url {{ gitlab_url }}
+        --registration-token {{ registration_token }}
+        --executor docker
+        --docker-image alpine:latest
+        --name {{ runner_name }}
+        --tag-list {{ runner_tags }}
+        --run-untagged=true
+        --locked=false
+      when: runner_check.stdout == "not_registered"
+
+    - name: S'assurer que le service gitlab-runner est démarré
+      systemd:
+        name: gitlab-runner
+        state: started
+        enabled: yes
+
+    - name: Afficher les runners enregistrés
+      shell: gitlab-runner list
+      register: runner_list
+
+    - name: Afficher la liste des runners
+      debug:
+        msg: "{{ runner_list.stdout }}"
+
+    - name: Vérifier le statut de Docker
+      shell: systemctl is-active docker
+      register: docker_status
+
+    - name: Afficher le statut de Docker
+      debug:
+        msg: "Docker status: {{ docker_status.stdout }}"

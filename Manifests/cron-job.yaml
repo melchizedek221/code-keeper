@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-scan-job
+  namespace: kube-system
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trivy
+            image: aquasec/trivy:latest
+            command:
+              - "/bin/sh"
+              - "-c"
+              - "trivy k8s --report summary cluster"
+          restartPolicy: OnFailure

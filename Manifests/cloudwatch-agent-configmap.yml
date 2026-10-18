@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudwatch-agent-config
+  namespace: amazon-cloudwatch
+data:
+  agent.json: |
+    {
+      "logs": {
+        "metrics_collected": {},
+        "force_flush_interval": 5,
+        "log_stream_name": "{instance_id}",
+        "log_group_name": "/aws/eks/cluster-logs",
+        "log_files": [
+          {
+            "file_path": "/var/log/containers/*.log",
+            "log_group_name": "/aws/eks/pod-logs"
+          }
+        ]
+      }
+    }

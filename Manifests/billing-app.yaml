@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: billing-app
+  namespace: microservices-network
+spec:
+  serviceName: "billing-app"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-app
+  template:
+    metadata:
+      labels:
+        app: billing-app
+    spec:
+      restartPolicy: Always
+      initContainers:
+      - name: wait-for-rabbitmq
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo "Waiting for rabbitmq to be ready"; until nc -z -v -w30 rabbitmq 5672; do echo "Waiting for rabbitmq"; sleep 5; done;']
+      - name: wait-for-billing-db
+        image: busybox:1.28
+        command: ['sh', '-c', 'echo "Waiting for billing-db to be ready"; until nc -z -v -w30 billing-db 5432; do echo "Waiting for billing-db"; sleep 5; done;']
+      containers:
+      - name: billing-app
+        image: osamb/billing_app:latest
+        env:
+        - name: BILLING_DB_URI
+          value: "postgresql://osamb:osamb@10.43.0.7:5432/billing_db"
+        - name : RABBITMQ_HOST
+          value: "10.43.0.9"
+        - name: RABBITMQ_QUEUE
+          valueFrom:
+              secretKeyRef:
+                name: rabbitmq-secrets
+                key: rabbitmq-queue
+        - name: RABBITMQ_USER
+          valueFrom:
+              secretKeyRef:
+                name: orchestrator-secrets
+                key: RABBITMQ_USER
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+              secretKeyRef:
+                name: orchestrator-secrets
+                key: RABBITMQ_PASSWORD
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-app
+  namespace: microservices-network
+spec:
+  clusterIP: 10.43.0.8
+  ports:
+    - port: 8080
+  selector:
+    app: billing-app

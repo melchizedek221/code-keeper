@@ -1,0 +1,26 @@
+resources:
+- Manifests/namespace.yml
+# - Manifests/admin-user.yml
+- Manifests/api-gateway.yaml
+# - Manifests/billing-app.yaml
+# - Manifests/billing-db.yaml
+# - Manifests/ingress.yaml
+- Manifests/inventory-app.yaml
+# - Manifests/inventory-db.yaml
+# - Manifests/postgres-pv.yaml
+# - Manifests/postgres-pvc.yaml
+- Manifests/postgres-secrets.yaml
+# - Manifests/rabbitmq-pv.yaml
+# - Manifests/rabbitmq-pvc.yaml
+- Manifests/rabbitmq-secrets.yaml
+- Manifests/cron-job.yaml
+
+namespace: microservices-network
+
+secretGenerator:
+- name: orchestrator-secrets
+  envs:
+  - .env
+
+generatorOptions:
+  disableNameSuffixHash: true

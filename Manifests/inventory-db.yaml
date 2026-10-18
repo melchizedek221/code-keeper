@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: inventory-db
+  namespace: microservices-network
+spec:
+  serviceName: "inventory-db"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-db
+  template:
+    metadata:
+      labels:
+        app: inventory-db
+    spec:
+      containers:
+      - name: postgres
+        image: osamb/inventory_db:latest
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: inventory-username 
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: inventory-password
+        - name: POSTGRES_DB
+          value: "inventory_db"
+        volumeMounts:
+        - name: inventory-db-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: inventory-db-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: inventory-db-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-db
+  namespace: microservices-network
+spec:
+  clusterIP: 10.43.0.5
+  ports:
+    - port: 5432
+  selector:
+    app: inventory-db

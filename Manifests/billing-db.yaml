@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: billing-db
+  namespace: microservices-network
+spec:
+  serviceName: "billing-db"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-db
+  template:
+    metadata:
+      labels:
+        app: billing-db
+    spec:
+      containers:
+      - name: postgres
+        image: osamb/billing_db:latest
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: billing-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: billing-password
+        - name: POSTGRES_DB
+          value: "billing_db"
+        volumeMounts:
+        - name: billing-db-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: billing-db-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: billing-db-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-db
+  namespace: microservices-network
+spec:
+  clusterIP: 10.43.0.7
+  ports:
+    - port: 5432
+  selector:
+    app: billing-db

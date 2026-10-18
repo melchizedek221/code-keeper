@@ -1,0 +1,67 @@
+- name: Installer et enregistrer un GitLab Runner
+  hosts: gitlab
+  become: yes
+  vars:
+    gitlab_url: "{{ lookup('env', 'GITLAB_URL') }}"
+    registration_token: "{{ lookup('env', 'GITLAB_RUNNER_TOKEN') }}"
+    runner_name: "ansible-runner-{{ ansible_hostname }}"
+    runner_tags: "shell,ansible,infra"
+
+  tasks:
+    - name: Debug variables
+      debug:
+        msg: "URL={{ gitlab_url }}, TOKEN={{ registration_token }}"
+
+    - name: Installer les dépendances nécessaires
+      apt:
+        name:
+          - curl
+          - git
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Ajouter la clé GPG de GitLab
+      apt_key:
+        url: https://packages.gitlab.com/runner/gitlab-runner/gpgkey
+        state: present
+
+    - name: Ajouter le dépôt GitLab Runner
+      apt_repository:
+        repo: "deb https://packages.gitlab.com/runner/gitlab-runner/ubuntu/ {{ ansible_distribution_release }} main"
+        state: present
+
+    - name: Installer GitLab Runner
+      apt:
+        name: gitlab-runner
+        state: latest
+
+    - name: Enregistrer le GitLab Runner (en tant que root)
+      become: yes
+      environment:
+        GITLAB_URL: "{{ gitlab_url }}"
+        GITLAB_RUNNER_TOKEN: "{{ registration_token }}"
+      shell: |
+        gitlab-runner register \
+          --non-interactive \
+          --url "{{ gitlab_url }}" \
+          --registration-token "{{ registration_token }}" \
+          --executor "shell" \
+          --name "{{ runner_name }}" \
+          --tag-list "{{ runner_tags }}"
+      args:
+        creates: /etc/gitlab-runner/config.toml
+
+    - name: S'assurer que le service gitlab-runner est démarré
+      systemd:
+        name: gitlab-runner
+        state: started
+        enabled: yes
+
+    - name: Vérifier les runners enregistrés
+      shell: gitlab-runner list
+      register: runner_list
+
+    - name: Afficher la liste des runners
+      debug:
+        msg: "{{ runner_list.stdout }}"

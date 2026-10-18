@@ -1,0 +1,9 @@
+aws_region    = "us-east-1"
+ami_id        = "<AMI_ID>"
+key_name      = "<YOUR_KEY_PAIR_NAME>"
+k3s_token     = "<K3S_TOKEN>"
+admin_cidr    = "<YOUR_IP>/32"   # avoid 0.0.0.0/0 in real deployments
+project_name  = "code-keeper"
+instance_type = "t3.micro"
+db_username   = "<DB_USERNAME>"
+db_password   = "<DB_PASSWORD>"

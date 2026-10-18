@@ -1,0 +1,86 @@
+image:
+  name: hashicorp/terraform:latest
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+variables:
+  TERRAGRUNT_VERSION: "v0.45.16"
+
+stages:
+  - init
+  - validate
+  - plan
+  - apply-staging
+  - approve
+  - apply-production
+
+before_script:
+  - apk add --no-cache curl bash unzip
+  - curl -Lo terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/${TERRAGRUNT_VERSION}/terragrunt_linux_amd64
+  - chmod +x terragrunt
+  - mv terragrunt /usr/local/bin/
+
+init-staging:
+  stage: init
+  script:
+    - cd envs/staging
+    - terragrunt init --terragrunt-non-interactive -force-copy
+
+init-production:
+  stage: init
+  script:
+    - cd envs/production
+    - terragrunt init --terragrunt-non-interactive -force-copy
+
+validate-staging:
+  stage: validate
+  script:
+    - cd envs/staging
+    - terragrunt validate --terragrunt-non-interactive 
+
+validate-production:
+  stage: validate
+  script:
+    - cd envs/production
+    - terragrunt validate --terragrunt-non-interactive
+
+plan-staging:
+  stage: plan
+  script:
+    - cd envs/staging
+    - terragrunt plan --terragrunt-non-interactive
+
+plan-production:
+  stage: plan
+  script:
+    - cd envs/production
+    - terragrunt plan --terragrunt-non-interactive
+
+apply-staging:
+  stage: apply-staging
+  script:
+    - cd envs/staging
+    - terragrunt init --terragrunt-non-interactive -force-copy
+    - terragrunt plan --terragrunt-non-interactive
+    - terragrunt apply -auto-approve
+
+approve-to-prod:
+  stage: approve
+  script:
+    - echo "Manual approval before deploying to production "
+  when: manual
+  only:
+    - main
+
+apply-production:
+  stage: apply-production
+  script:
+    - cd envs/production
+    - terragrunt init --terragrunt-non-interactive -force-copy
+    - terragrunt plan --terragrunt-non-interactive
+    - terragrunt apply -auto-approve
+  when: manual
+  only:
+    - main
+

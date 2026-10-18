@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: microservices-network
+spec:
+  serviceName: "rabbitmq"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: osamb/rabbit_queue:latest
+        ports:
+        - containerPort: 5672   # AMQP port
+        - containerPort: 15672  # Management UI
+        env:
+          - name: RABBITMQ_USER
+            valueFrom:
+              secretKeyRef:
+                name: rabbitmq-secrets
+                key: rabbitmq-username
+          - name: RABBITMQ_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: rabbitmq-secrets
+                key: rabbitmq-password
+          - name: RABBITMQ_QUEUE
+            valueFrom:
+              secretKeyRef:
+                name: rabbitmq-secrets
+                key: rabbitmq-queue
+          - name: RABBITMQ_HOST
+            valueFrom:
+              secretKeyRef:
+                name: rabbitmq-secrets
+                key: rabbitmq-host
+        volumeMounts:
+        - name: rabbitmq-storage
+          mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbitmq-storage
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: rabbitmq-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: microservices-network
+spec:
+  clusterIP: 10.43.0.9
+  ports:
+     - name: amqp          # Ajout du nom pour le port AMQP
+       port: 5672
+       targetPort: 5672
+     - name: management    # Ajout du nom pour le port Management
+       port: 15672
+       targetPort: 15672
+  selector:
+    app: rabbitmq
